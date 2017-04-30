@@ -59,11 +59,45 @@ def read_temperature(dev):
             r=mb.execute(addr, 4, 7002, 2) 
             return unpack('f', pack('<HH', r[1], r[0]))[0]
 
-        addr, fn, l = 1, 3, 1
-        if dev=="S2":
+
+        # ---------------------------------------------------------------------
+        #   SENECA GATEWAY 0
+        # ---------------------------------------------------------------------
+        addr=1
+        conf_offset=34
+        pt1000_flags=0b0000000011000010
+
+        # Channel 1
+        fn, l = 3, 1
+        if dev=="CIRCUIT_DOWNSTAIRS":
             reg=3
-            mb.execute(addr, 6, 37-1, output_value=0b0000000011000010) # write PT1000
+            mb.execute(addr, 6, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
+
+        # Channel 2
+        fn, l = 3, 1
+        if dev=="CIRCUIT_UPSTAIRS":
+            reg=4
+            mb.execute(addr, 6, conf_offset+reg-1, output_value=pt1000_flags) 
+            return float(mb.execute(addr, fn, reg-1, l)[0])/10
+
+        # Channel 3
+        fn, l = 3, 1
+        if dev=="TANK":
+            reg=5
+            mb.execute(addr, 6, conf_offset+reg-1, output_value=pt1000_flags) 
+            return float(mb.execute(addr, fn, reg-1, l)[0])/10
+
+        # Channel 4
+        fn, l = 3, 1
+        if dev=="BOILER":
+            reg=6
+            mb.execute(addr, 6, conf_offset+reg-1, output_value=pt1000_flags) 
+            return float(mb.execute(addr, fn, reg-1, l)[0])/10
+
+
+
+
 
         addr, fn, l = 2, 3, 1
         if dev=="TERMO":
@@ -90,7 +124,10 @@ ser, mb = init_mb_serial()
 
 #print read_temperature("HOME_UP")
 #print read_temperature("TERMO")
-#print read_temperature("S2")
+print read_temperature("CIRCUIT_DOWNSTAIRS")
+print read_temperature("CIRCUIT_UPSTAIRS")
+print read_temperature("TANK")
+print read_temperature("BOILER")
 print "--"
 
 
