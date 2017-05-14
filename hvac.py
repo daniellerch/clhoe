@@ -66,33 +66,63 @@ def read_temperature(dev):
         addr=1
         conf_offset=34
         pt1000_flags=0b0000000011000010
+        fn, wfn, l = 3, 6, 1
 
         # Channel 1
-        fn, l = 3, 1
-        if dev=="CIRCUIT_DOWNSTAIRS":
+        if dev=="C1_1":
             reg=3
-            mb.execute(addr, 6, conf_offset+reg-1, output_value=pt1000_flags) 
+            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
         # Channel 2
-        fn, l = 3, 1
-        if dev=="CIRCUIT_UPSTAIRS":
+        if dev=="C2_1":
             reg=4
-            mb.execute(addr, 6, conf_offset+reg-1, output_value=pt1000_flags) 
+            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
         # Channel 3
-        fn, l = 3, 1
-        if dev=="TANK":
+        if dev=="C3_1":
             reg=5
-            mb.execute(addr, 6, conf_offset+reg-1, output_value=pt1000_flags) 
+            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
         # Channel 4
-        fn, l = 3, 1
-        if dev=="BOILER":
+        if dev=="C4_1":
             reg=6
-            mb.execute(addr, 6, conf_offset+reg-1, output_value=pt1000_flags) 
+            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
+            return float(mb.execute(addr, fn, reg-1, l)[0])/10
+
+
+        # ---------------------------------------------------------------------
+        #   SENECA GATEWAY 1
+        # ---------------------------------------------------------------------
+        addr=2
+        conf_offset=34
+        pt1000_flags=0b0000000011000010
+        fn, wfn, l = 3, 6, 1
+
+        # Channel 1
+        if dev=="C1_2":
+            reg=3
+            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
+            return float(mb.execute(addr, fn, reg-1, l)[0])/10
+
+        # Channel 2
+        if dev=="C2_2":
+            reg=4
+            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
+            return float(mb.execute(addr, fn, reg-1, l)[0])/10
+
+        # Channel 3
+        if dev=="ACS":
+            reg=5
+            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
+            return float(mb.execute(addr, fn, reg-1, l)[0])/10
+
+        # Channel 4
+        if dev=="C4_2":
+            reg=6
+            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
 
@@ -124,10 +154,14 @@ ser, mb = init_mb_serial()
 
 #print read_temperature("HOME_UP")
 #print read_temperature("TERMO")
-print read_temperature("CIRCUIT_DOWNSTAIRS")
-print read_temperature("CIRCUIT_UPSTAIRS")
-print read_temperature("TANK")
-print read_temperature("BOILER")
+print "C1_1:", read_temperature("C1_1")
+print "C2_1:", read_temperature("C2_1")
+print "C3_1:", read_temperature("C3_1")
+print "C4_1:", read_temperature("C4_1")
+print "C1_2:", read_temperature("C1_2")
+print "C2_2:", read_temperature("C2_2")
+print "ACS:", read_temperature("ACS")
+print "C4_2:", read_temperature("C4_2")
 print "--"
 
 
