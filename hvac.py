@@ -25,10 +25,7 @@ SERIALPORT="/dev/ttyUSB0"
 
 # -- MODBUS --
 
-# {{{ init_mb_serial()
 def init_mb_serial():
-
-    # Initialize Modbus RTU
     ser = serial.Serial(
         port=SERIALPORT,
         baudrate=BAUDRATE,
@@ -36,16 +33,12 @@ def init_mb_serial():
         #stopbits=serial.STOPBITS_TWO
         stopbits=serial.STOPBITS_ONE
     )
-
     mb = mb_rtu.RtuMaster(ser)
     mb.set_timeout(1)
 
     return ser, mb
-# }}}
 
-# {{{ read_temperature()
-def read_temperature(dev):
-
+def query_temperature_by_name(dev):
     try:
         addr, fn, l = 2, 4, 2
         if dev=="HOME_UP":
@@ -81,13 +74,13 @@ def read_temperature(dev):
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
         # Channel 3
-        if dev=="C3_1":
+        if dev=="S1":
             reg=5
             mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
         # Channel 4
-        if dev=="C4_1":
+        if dev=="INERCIA":
             reg=6
             mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
@@ -120,12 +113,10 @@ def read_temperature(dev):
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
         # Channel 4
-        if dev=="C4_2":
+        if dev=="S2":
             reg=6
             mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
-
-
 
 
 
@@ -137,36 +128,46 @@ def read_temperature(dev):
 
 
     except:
-        print "ERROR:", traceback.format_exc()
-        return None
+        #print "ERROR:", traceback.format_exc()
+        #return None
+        raise
 
     return None
-# }}}
+
+def read_temperature(dev):
+    for i in range(3):
+        try:
+            temperature=query_temperature_by_name(dev)
+            return temperature
+        except:
+            pass
+
+    return query_temperature_by_name(dev)
+
+
 
 # -- UTILS --
 
-# {{{ tm()
 def tm():
     return "["+strftime("%Y-%m-%d %H:%M:%S")+"]"
-# }}}
 
 ser, mb = init_mb_serial()
 
 #print read_temperature("HOME_UP")
 #print read_temperature("TERMO")
-print "C1_1:", read_temperature("C1_1")
-print "C2_1:", read_temperature("C2_1")
-print "C3_1:", read_temperature("C3_1")
-print "C4_1:", read_temperature("C4_1")
-print "C1_2:", read_temperature("C1_2")
-print "C2_2:", read_temperature("C2_2")
+#print "C1_1:", read_temperature("C1_1")
+#print "C2_1:", read_temperature("C2_1")
+print "S1:", read_temperature("S1")
+print "INERCIA:", read_temperature("INERCIA")
+#print "C1_2:", read_temperature("C1_2")
+#print "C2_2:", read_temperature("C2_2")
 print "ACS:", read_temperature("ACS")
-print "C4_2:", read_temperature("C4_2")
+print "S2:", read_temperature("S2")
 print "--"
 
 
-print "[1] ERR CH1 CH2:", mb.execute(1, 3, 25-1, 1)
-print "[2] ERR CH1 CH2:", mb.execute(2, 3, 25-1, 1)
+#print "[1] ERR CH1 CH2:", mb.execute(1, 3, 25-1, 1)
+#print "[2] ERR CH1 CH2:", mb.execute(2, 3, 25-1, 1)
 #print "[1] CONF CH1:", mb.execute(1, 3, 37-1, 1)
 #print "[2] CONF CH1:", mb.execute(2, 3, 37-1, 1)
 #print "--"
