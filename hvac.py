@@ -13,6 +13,8 @@ import unicodedata
 import traceback
 import modbus_tk.defines as mb_def
 import modbus_tk.modbus_rtu as mb_rtu
+import urllib2
+import base64
 from time import gmtime, strftime
 from pprint import pprint
 from struct import unpack, pack
@@ -21,7 +23,8 @@ from struct import unpack, pack
 
 BAUDRATE=9600
 SERIALPORT="/dev/ttyUSB0"
-
+USERNAME='admin'
+PASSWORD='opendomo'
 
 # -- MODBUS --
 
@@ -144,6 +147,29 @@ def read_temperature(dev):
 
     return query_temperature_by_name(dev)
 
+def set_value(name, value):
+    if value not in ["ON", "OFF"]:
+        print "set() unknown value"
+        sys.exit(0)
+
+    request = urllib2.Request("http://192.168.1.77:81/set+"+name+'+'+value)
+    base64string = base64.b64encode('%s:%s' % (USERNAME, PASSWORD))
+    request.add_header("Authorization", "Basic %s" % base64string)   
+    result = urllib2.urlopen(request)
+    data=result.read().split('\n')
+    if data[0]!="DONE":
+        print "Warning! set_value() failed!"
+
+def get_value(name):
+    request = urllib2.Request("http://192.168.1.77:81/lsc+"+name)
+    base64string = base64.b64encode('%s:%s' % (USERNAME, PASSWORD))
+    request.add_header("Authorization", "Basic %s" % base64string)   
+    result = urllib2.urlopen(request)
+    data=result.read().split('\n')
+    field=data[0].split(':')
+    return field[2]
+
+
 
 
 # -- UTILS --
@@ -164,6 +190,13 @@ print "INERCIA:", read_temperature("INERCIA")
 print "ACS:", read_temperature("ACS")
 print "S2:", read_temperature("S2")
 print "--"
+
+
+set_value("BmC01", "ON")
+print get_value("BmC01")
+
+set_value("BmC01", "OFF")
+print get_value("BmC01")
 
 
 #print "[1] ERR CH1 CH2:", mb.execute(1, 3, 25-1, 1)
