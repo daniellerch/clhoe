@@ -16,6 +16,7 @@ import modbus_tk.modbus_rtu as mb_rtu
 import urllib2
 import base64
 import signal
+import inspect
 from time import gmtime, strftime
 from pprint import pprint
 from struct import unpack, pack
@@ -35,6 +36,8 @@ ODC_USERNAME='admin'
 ODC_PASSWORD='opendomo'
 
 # hvac donf
+COMFORT_TEMPERATURE_ZONE1=18
+COMFORT_TEMPERATURE_ZONE2=18
 ENDLESS_SCREW_LOADING_TIME=10
 ENDLESS_SCREW_DIFSTOP_TIME=2
 ENDLESS_SCREW_WAITING_TIME=60
@@ -76,10 +79,10 @@ def query_temperature_by_name(dev):
         # ---------------------------------------------------------------------
         #   TEMPERATURE SENSOR 1
         # ---------------------------------------------------------------------
-        addr, fn, l = 11, 4, 2
+        addr, fn, l = 9, 4, 2
         if dev=="HOME_TEMP_1":
             reg=7002
-            mb.execute(247, 6, 4001, output_value=addr) # change mb address
+            #mb.execute(247, 6, 4001, output_value=addr) # change mb address
             r=mb.execute(addr, 4, 7002, 2) 
             return unpack('f', pack('<HH', r[1], r[0]))[0]
 
@@ -92,9 +95,6 @@ def query_temperature_by_name(dev):
             #mb.execute(247, 6, 4001, output_value=addr) # change mb address
             r=mb.execute(addr, 4, 7002, 2) 
             return unpack('f', pack('<HH', r[1], r[0]))[0]
-
-
-
 
 
         # ---------------------------------------------------------------------
@@ -182,7 +182,7 @@ def read_temperature(dev):
     for i in range(3):
         try:
             temp=temperature=query_temperature_by_name(dev)
-            debug(dev+" temperature is "+str(temp))
+            #debug(dev+" temperature is "+str(temp))
             return temperature
         except:
             pass
@@ -190,7 +190,7 @@ def read_temperature(dev):
     return query_temperature_by_name(dev)
 
 def set_value(name, value):
-    debug("set "+name+" to "+value)
+    #debug("set "+name+" to "+value)
     if value not in ["ON", "OFF"]:
         print "set() unknown value"
         sys.exit(0)
@@ -212,20 +212,10 @@ def get_value(name):
     field=data[0].split(':')
     return field[2]
 
-def set_interval(func, sec):
-    def func_wrapper():
-        set_interval(func, sec)
-        func()
-    t = threading.Timer(sec, func_wrapper)
-    t.start()
-    return t
-
-def tm():
-    s="["+strftime("%Y-%m-%d %H:%M:%S")+"]"
-    return s
-
 def debug(string):
-    print tm()+" "+string
+    s="["+strftime("%Y-%m-%d %H:%M:%S")+"]"
+    name=inspect.stack()[1][3]
+    print s+" : "+name+" - "+string
     return
 
 
@@ -237,7 +227,7 @@ ser, mb = init_mb_serial()
 #print "ACS:", read_temperature("ACS")
 #print read_temperature("TERMO")
 #read_temperature("HOME_TEMP_2")
-read_temperature("HOME_TEMP_1")
+#read_temperature("HOME_TEMP_1")
 #print "C1_1:", read_temperature("C1_1")
 #print "C2_1:", read_temperature("C2_1")
 #print "C1_PROBE:", read_temperature("C1_PROBE")
@@ -246,7 +236,8 @@ read_temperature("HOME_TEMP_1")
 #print "C2_2:", read_temperature("C2_2")
 #print "ACS:", read_temperature("ACS")
 #print "C2_PROBE:", read_temperature("C2_PROBE")
-sys.exit(0)
+#sys.exit(0)
+
 
 # HVAC SYSTEM
 
@@ -280,10 +271,8 @@ def set_state(state_machine, state):
                UNDERFLOR_HEATING_WATER_PUMP_C2_STATE +" -> "+state)
         UNDERFLOR_HEATING_WATER_PUMP_C2_STATE=state
         UNDERFLOR_HEATING_WATER_PUMP_C2_STATE_T0=int(time.time())
- 
 
-
-def stop(signum, frame):
+def stop_all(signum, frame):
     print 'exit ...' 
     set_value("TERMO", "OFF"); print "TERMO:", get_value("TERMO")
     set_value("BmC01", "OFF"); print "BmC01:", get_value("BmC01")
@@ -295,12 +284,21 @@ def stop(signum, frame):
     set_value("BmCAL", "OFF"); print "BmCAL:", get_value("BmCAL")
     sys.exit(0)
 
+def query_temperatures():
+    print "HOME_TEMP_1:", read_temperature("HOME_TEMP_1")
+    print "HOME_TEMP_2:", read_temperature("HOME_TEMP_2")
+    print "C1_PROBE:", read_temperature("C1_PROBE")
+    print "C2_PROBE:", read_temperature("C2_PROBE")
+    print "INERCIA_PROBE:", read_temperature("INERCIA_PROBE")
+    print "ACS:", read_temperature("ACS")
+
 def process_endless_screw():
     t0=ENDLESS_SCREW_STATE_T0
     t1=int(time.time())
 
     if ENDLESS_SCREW_STATE=="waiting":
         if t1-t0 > ENDLESS_SCREW_WAITING_TIME:
+            debug("Turn on endless screws")
             set_value("SFqum", "ON"); 
             set_value("SFdep", "ON");
             set_state("ENDLESS_SCREW_STATE", "loading") 
@@ -308,12 +306,14 @@ def process_endless_screw():
 
     if ENDLESS_SCREW_STATE=="loading":
         if t1-t0 > ENDLESS_SCREW_LOADING_TIME:
+            debug("Turn off tank endless screw")
             set_value("SFdep", "OFF"); 
             set_state("ENDLESS_SCREW_STATE", "stopping") 
             return
 
     if ENDLESS_SCREW_STATE=="stopping":
         if t1-t0 > ENDLESS_SCREW_DIFSTOP_TIME:
+            debug("Turn off burner endless screw")
             set_value("SFqum", "OFF"); 
             set_state("ENDLESS_SCREW_STATE", "waiting") 
             return
@@ -326,10 +326,14 @@ def process_boiler_water_pump():
 
         temp_inercia=read_temperature("INERCIA_PROBE")
         temp_probe=read_temperature("BOILER_PROBE")
+        debug("Inercia temperature: "+str(temp_inercia))
+        debug("Boiler temperature: "+str(temp_probe))
 
         if temp_probe>temp_inercia:
+            debug("Boiler is hot! Turn on boiler pump")
             set_value("BmCAL", "ON")
         else:
+            debug("Boiler is cold. Turn off boiler pump")
             set_value("BmCAL", "OFF")
             
         set_state("BOILER_WATER_PUMP_STATE", "waiting") 
@@ -342,15 +346,23 @@ def process_underfloor_heating_water_pump_C1():
 
         temp_inercia=read_temperature("INERCIA_PROBE")
         temp_probe=read_temperature("C1_PROBE")
+        temp_home=read_temperature("HOME_TEMP_1")
 
-        # TODO: check confort temperature
+        debug("Inercia temperature: "+str(temp_inercia))
+        debug("Circuit temperature: "+str(temp_probe))
+        debug("Home temperature (zone 1): "+str(temp_probe))
 
         if temp_probe>UNDERFLOR_HEATING_MAX_TEMPERATURE:
-            debug(probe_name+" temperature is too high!")
+            debug("Temperature is too high! Turn of pump.")
+            set_value("BmC01", "OFF")
+        elif temp_home>=COMFORT_TEMPERATURE_ZONE1:
+            debug("Comfort temperature reached! Turn of pump.")
             set_value("BmC01", "OFF")
         elif temp_inercia>temp_probe:
+            debug("Turn on pump")
             set_value("BmC01", "ON")
         else:
+            debug("Inercia temperature is not enough. Turn off pump.")
             set_value("BmC01", "OFF")
             
         set_state("UNDERFLOR_HEATING_WATER_PUMP_C1_STATE", "waiting") 
@@ -363,15 +375,23 @@ def process_underfloor_heating_water_pump_C2():
 
         temp_inercia=read_temperature("INERCIA_PROBE")
         temp_probe=read_temperature("C2_PROBE")
+        temp_home=read_temperature("HOME_TEMP_2")
 
-        # TODO: check confort temperature
+        debug("Inercia temperature: "+str(temp_inercia))
+        debug("Circuit temperature: "+str(temp_probe))
+        debug("Home temperature (zone 2): "+str(temp_probe))
 
         if temp_probe>UNDERFLOR_HEATING_MAX_TEMPERATURE:
-            debug(probe_name+" temperature is too high!")
+            debug("Temperature is too high! Turn of pump.")
+            set_value("BmC02", "OFF")
+        elif temp_home>=COMFORT_TEMPERATURE_ZONE2:
+            debug("Comfort temperature reached! Turn of pump.")
             set_value("BmC02", "OFF")
         elif temp_inercia>temp_probe:
+            debug("Turn on pump.")
             set_value("BmC02", "ON")
         else:
+            debug("Inercia temperature is not enough. Turn off pump.")
             set_value("BmC02", "OFF")
             
         set_state("UNDERFLOR_HEATING_WATER_PUMP_C2_STATE", "waiting") 
@@ -381,19 +401,25 @@ def water_heating():
     pass
 
 
-signal.signal(signal.SIGINT, stop)
 
-set_value("VENTL", "ON")
+if __name__ == "__main__":
+    print sys.argv
+    if len(sys.argv)==2 and sys.argv[1]=="query_temperatures":
+        query_temperatures()
+        sys.exit(0)
 
-# Main loop
-while True:
-    time.sleep(0.5)
-    t=int(time.time())
+    signal.signal(signal.SIGINT, stop_all)
 
-    process_endless_screw()
-    process_boiler_water_pump()
-    process_underfloor_heating_water_pump_C1()
-    process_underfloor_heating_water_pump_C2()
+    debug("turn on turbine")
+    set_value("VENTL", "ON")
+
+    # Main loop
+    while True:
+        time.sleep(0.5)
+        process_endless_screw()
+        process_boiler_water_pump()
+        process_underfloor_heating_water_pump_C1()
+        process_underfloor_heating_water_pump_C2()
 
 
 
