@@ -73,17 +73,28 @@ def query_temperature_by_name(dev):
             debug("WARNING, not implemented: "+dev);
             return 80
 
-        addr, fn, l = 2, 4, 2
-        if dev=="HOME_UP":
+        # ---------------------------------------------------------------------
+        #   TEMPERATURE SENSOR 1
+        # ---------------------------------------------------------------------
+        addr, fn, l = 11, 4, 2
+        if dev=="HOME_TEMP_1":
             reg=7002
-            #mb.execute(addr, 6, 4001, output_value=2) # change mb address
-            r=mb.execute(addr, 4, 7010, 2) 
-            print "temp min", unpack('f', pack('<HH', r[1], r[0]))[0]
-            r=mb.execute(addr, 4, 7012, 2) 
-            print "temp max", unpack('f', pack('<HH', r[1], r[0]))[0]
-
+            mb.execute(247, 6, 4001, output_value=addr) # change mb address
             r=mb.execute(addr, 4, 7002, 2) 
             return unpack('f', pack('<HH', r[1], r[0]))[0]
+
+        # ---------------------------------------------------------------------
+        #   TEMPERATURE SENSOR 2
+        # ---------------------------------------------------------------------
+        addr, fn, l = 10, 4, 2
+        if dev=="HOME_TEMP_2":
+            reg=7002
+            #mb.execute(247, 6, 4001, output_value=addr) # change mb address
+            r=mb.execute(addr, 4, 7002, 2) 
+            return unpack('f', pack('<HH', r[1], r[0]))[0]
+
+
+
 
 
         # ---------------------------------------------------------------------
@@ -222,19 +233,20 @@ def debug(string):
 
 ser, mb = init_mb_serial()
 
-"""
-#print read_temperature("HOME_UP")
+
+#print "ACS:", read_temperature("ACS")
 #print read_temperature("TERMO")
+#read_temperature("HOME_TEMP_2")
+read_temperature("HOME_TEMP_1")
 #print "C1_1:", read_temperature("C1_1")
 #print "C2_1:", read_temperature("C2_1")
-print "C1_PROBE:", read_temperature("C1_PROBE")
-print "INERCIA_PROBE:", read_temperature("INERCIA_PROBE")
+#print "C1_PROBE:", read_temperature("C1_PROBE")
+#print "INERCIA_PROBE:", read_temperature("INERCIA_PROBE")
 #print "C1_2:", read_temperature("C1_2")
 #print "C2_2:", read_temperature("C2_2")
-print "ACS:", read_temperature("ACS")
-print "C2_PROBE:", read_temperature("C2_PROBE")
-print "--"
-"""
+#print "ACS:", read_temperature("ACS")
+#print "C2_PROBE:", read_temperature("C2_PROBE")
+sys.exit(0)
 
 # HVAC SYSTEM
 
@@ -331,6 +343,8 @@ def process_underfloor_heating_water_pump_C1():
         temp_inercia=read_temperature("INERCIA_PROBE")
         temp_probe=read_temperature("C1_PROBE")
 
+        # TODO: check confort temperature
+
         if temp_probe>UNDERFLOR_HEATING_MAX_TEMPERATURE:
             debug(probe_name+" temperature is too high!")
             set_value("BmC01", "OFF")
@@ -350,6 +364,8 @@ def process_underfloor_heating_water_pump_C2():
         temp_inercia=read_temperature("INERCIA_PROBE")
         temp_probe=read_temperature("C2_PROBE")
 
+        # TODO: check confort temperature
+
         if temp_probe>UNDERFLOR_HEATING_MAX_TEMPERATURE:
             debug(probe_name+" temperature is too high!")
             set_value("BmC02", "OFF")
@@ -360,14 +376,14 @@ def process_underfloor_heating_water_pump_C2():
             
         set_state("UNDERFLOR_HEATING_WATER_PUMP_C2_STATE", "waiting") 
 
-
 def water_heating():
-    
-    debug("-- water_heating() --")
     # TODO: turn on water heating only if confort temperature is reached
+    pass
 
 
 signal.signal(signal.SIGINT, stop)
+
+set_value("VENTL", "ON")
 
 # Main loop
 while True:
