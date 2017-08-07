@@ -403,24 +403,26 @@ def water_heating():
 
 
 if __name__ == "__main__":
-    print sys.argv
-    if len(sys.argv)==2 and sys.argv[1]=="query_temperatures":
+
+    if len(sys.argv)==2 and sys.argv[1]=="show-temps":
         query_temperatures()
-        sys.exit(0)
 
-    signal.signal(signal.SIGINT, stop_all)
+    elif len(sys.argv)==2 and sys.argv[1]=="run":
 
-    debug("turn on turbine")
-    set_value("VENTL", "ON")
+        signal.signal(signal.SIGINT, stop_all)
 
-    # Main loop
-    while True:
-        time.sleep(0.5)
-        process_endless_screw()
-        process_boiler_water_pump()
-        process_underfloor_heating_water_pump_C1()
-        process_underfloor_heating_water_pump_C2()
+        debug("turn on turbine")
+        set_value("VENTL", "ON")
 
+        # Main loop
+        while True:
+            time.sleep(0.5)
+            process_endless_screw()
+            process_boiler_water_pump()
+            process_underfloor_heating_water_pump_C1()
+            process_underfloor_heating_water_pump_C2()
 
-
+    else:
+        print "Usage:", sys.argv[0], "<run|show-temps>"
+        print 
 
