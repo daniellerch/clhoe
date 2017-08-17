@@ -72,10 +72,6 @@ def init_mb_serial():
 def query_temperature_by_name(dev):
     try:
 
-        if dev == "BOILER_PROBE":
-            debug("WARNING, not implemented: "+dev);
-            return 80
-
         # ---------------------------------------------------------------------
         #   TEMPERATURE SENSOR 1
         # ---------------------------------------------------------------------
@@ -106,13 +102,13 @@ def query_temperature_by_name(dev):
         fn, wfn, l = 3, 6, 1
 
         # Channel 1
-        if dev=="C1_1":
+        if dev=="TERMO":
             reg=3
-            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
+            #mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
         # Channel 2
-        if dev=="C2_1":
+        if dev=="ACS":
             reg=4
             mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
@@ -120,13 +116,13 @@ def query_temperature_by_name(dev):
         # Channel 3
         if dev=="C1_PROBE":
             reg=5
-            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
+            #mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
         # Channel 4
         if dev=="INERCIA_PROBE":
             reg=6
-            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
+            #mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
 
@@ -139,37 +135,28 @@ def query_temperature_by_name(dev):
         fn, wfn, l = 3, 6, 1
 
         # Channel 1
-        if dev=="C1_2":
+        if dev=="NONE_11":
             reg=3
             mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
         # Channel 2
-        if dev=="C2_2":
+        if dev=="NONE_12":
             reg=4
             mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
         # Channel 3
-        if dev=="ACS":
+        if dev=="BOILER_PROBE":
             reg=5
-            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
+             #mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
 
         # Channel 4
         if dev=="C2_PROBE":
             reg=6
-            mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
+            #mb.execute(addr, wfn, conf_offset+reg-1, output_value=pt1000_flags) 
             return float(mb.execute(addr, fn, reg-1, l)[0])/10
-
-
-
-        addr, fn, l = 2, 3, 1
-        if dev=="TERMO":
-            reg=3
-            mb.execute(addr, 6, 37-1, output_value=0b0000000000000010) # write PT100
-            return float(mb.execute(addr, fn, reg-1, l)[0])/10
-
 
     except:
         #print "ERROR:", traceback.format_exc()
@@ -224,20 +211,6 @@ def debug(string):
 ser, mb = init_mb_serial()
 
 
-#print "ACS:", read_temperature("ACS")
-#print read_temperature("TERMO")
-#read_temperature("HOME_TEMP_2")
-#read_temperature("HOME_TEMP_1")
-#print "C1_1:", read_temperature("C1_1")
-#print "C2_1:", read_temperature("C2_1")
-#print "C1_PROBE:", read_temperature("C1_PROBE")
-#print "INERCIA_PROBE:", read_temperature("INERCIA_PROBE")
-#print "C1_2:", read_temperature("C1_2")
-#print "C2_2:", read_temperature("C2_2")
-#print "ACS:", read_temperature("ACS")
-#print "C2_PROBE:", read_temperature("C2_PROBE")
-#sys.exit(0)
-
 
 # HVAC SYSTEM
 
@@ -285,12 +258,21 @@ def stop_all(signum, frame):
     sys.exit(0)
 
 def query_temperatures():
-    print "HOME_TEMP_1:", read_temperature("HOME_TEMP_1")
-    print "HOME_TEMP_2:", read_temperature("HOME_TEMP_2")
-    print "C1_PROBE:", read_temperature("C1_PROBE")
-    print "C2_PROBE:", read_temperature("C2_PROBE")
-    print "INERCIA_PROBE:", read_temperature("INERCIA_PROBE")
-    print "ACS:", read_temperature("ACS")
+    print
+    print "MODBUS DIRECT:"
+    print "- HOME_TEMP_1:", read_temperature("HOME_TEMP_1")
+    print "- HOME_TEMP_2:", read_temperature("HOME_TEMP_2")
+    print 
+    print "MODBUS GATEWAY:"
+    print "- C1_PROBE:", read_temperature("C1_PROBE")
+    print "- C2_PROBE:", read_temperature("C2_PROBE")
+    print "- BOILER_PROBE:", read_temperature("BOILER_PROBE")
+    print "- INERCIA_PROBE:", read_temperature("INERCIA_PROBE")
+    print "- ACS:", read_temperature("ACS")
+    print "- TERMO:", read_temperature("TERMO")
+    print "- NONE_11:", read_temperature("NONE_11")
+    print "- NONE_12:", read_temperature("NONE_12")
+    print
 
 def process_endless_screw():
     t0=ENDLESS_SCREW_STATE_T0
