@@ -35,16 +35,17 @@ MB_STOPBITS=serial.STOPBITS_ONE
 ODC_USERNAME='admin'
 ODC_PASSWORD='opendomo'
 
-# hvac donf
+# hvac conf
 COMFORT_TEMPERATURE_ZONE1=18
 COMFORT_TEMPERATURE_ZONE2=18
-ENDLESS_SCREW_LOADING_TIME=10
+ENDLESS_SCREW_LOADING_TIME=5
 ENDLESS_SCREW_DIFSTOP_TIME=2
-ENDLESS_SCREW_WAITING_TIME=60
+ENDLESS_SCREW_WAITING_TIME=120
 BOILER_WATER_PUMP_WAITING_TIME=60
 UNDERFLOR_HEATING_MAX_TEMPERATURE=45
 UNDERFLOR_HEATING_WATER_PUMP_WAITING_TIME=60
 WATER_HEATING_CHECKING_TIME=60
+BOILER_TEMP_MIN_DIFF=5
 
 # state machines
 ENDLESS_SCREW_STATE="waiting"
@@ -178,9 +179,9 @@ def read_temperature(dev):
 
 def set_value(name, value):
     #debug("set "+name+" to "+value)
-    if value not in ["ON", "OFF"]:
-        print "set() unknown value"
-        sys.exit(0)
+    #if value not in ["ON", "OFF"]:
+    #    print "set() unknown value"
+    #    sys.exit(0)
 
     request = urllib2.Request("http://192.168.1.77:81/set+"+name+'+'+value)
     base64string = base64.b64encode('%s:%s' % (ODC_USERNAME, ODC_PASSWORD))
@@ -189,6 +190,7 @@ def set_value(name, value):
     data=result.read().split('\n')
     if data[0]!="DONE":
         print "Warning! set_value() failed!"
+        sys.stdout.flush()
 
 def get_value(name):
     request = urllib2.Request("http://192.168.1.77:81/lsc+"+name)
@@ -203,6 +205,7 @@ def debug(string):
     s="["+strftime("%Y-%m-%d %H:%M:%S")+"]"
     name=inspect.stack()[1][3]
     print s+" : "+name+" - "+string
+    sys.stdout.flush()
     return
 
 
@@ -255,6 +258,7 @@ def stop_all(signum, frame):
     set_value("SFqum", "OFF"); print "SFqum:", get_value("SFqum")
     set_value("VENTL", "OFF"); print "VENTL:", get_value("VENTL")
     set_value("BmCAL", "OFF"); print "BmCAL:", get_value("BmCAL")
+    sys.stdout.flush()
     sys.exit(0)
 
 def query_temperatures():
@@ -273,6 +277,18 @@ def query_temperatures():
     print "- NONE_11:", read_temperature("NONE_11")
     print "- NONE_12:", read_temperature("NONE_12")
     print
+    sys.stdout.flush()
+
+def copy_temperatures_to_odc():
+    set_value("Tdown", str(read_temperature("HOME_TEMP_1")*10000))
+    set_value("Tupst", str(read_temperature("HOME_TEMP_2")*10000)) 
+    set_value("TCdwn", str(read_temperature("C1_PROBE")*10000))
+    set_value("TCups", str(read_temperature("C2_PROBE")*10000)) 
+    set_value("Tboil", str(read_temperature("BOILER_PROBE")*10000)) 
+    set_value("TtACS", str(read_temperature("ACS")*10000)) 
+    set_value("Termo", str(read_temperature("TERMO")*10000)) 
+    set_value("Tiner", str(read_temperature("INERCIA_PROBE")*10000)) 
+
 
 def process_endless_screw():
     t0=ENDLESS_SCREW_STATE_T0
@@ -311,7 +327,7 @@ def process_boiler_water_pump():
         debug("Inercia temperature: "+str(temp_inercia))
         debug("Boiler temperature: "+str(temp_probe))
 
-        if temp_probe>temp_inercia:
+        if temp_probe>temp_inercia+BOILER_TEMP_MIN_DIFF:
             debug("Boiler is hot! Turn on boiler pump")
             set_value("BmCAL", "ON")
         else:
@@ -389,6 +405,15 @@ if __name__ == "__main__":
     if len(sys.argv)==2 and sys.argv[1]=="show-temps":
         query_temperatures()
 
+    if len(sys.argv)==2 and sys.argv[1]=="copy-temps":
+        copy_temperatures_to_odc()
+
+    if len(sys.argv)==4 and sys.argv[1]=="cmd":
+        name=sys.argv[2]
+        value=sys.argv[3]
+        set_value(name, value)
+        print get_value(name)
+
     elif len(sys.argv)==2 and sys.argv[1]=="run":
 
         signal.signal(signal.SIGINT, stop_all)
@@ -398,6 +423,7 @@ if __name__ == "__main__":
 
         # Main loop
         while True:
+            sys.stdout.flush()
             time.sleep(0.5)
             process_endless_screw()
             process_boiler_water_pump()
