@@ -431,6 +431,6 @@ if __name__ == "__main__":
             process_underfloor_heating_water_pump_C2()
 
     else:
-        print "Usage:", sys.argv[0], "<run|show-temps>"
+        print "Usage:", sys.argv[0], "<run|show-temps|copy-temps|cmd>"
         print 
 
