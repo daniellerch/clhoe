@@ -36,13 +36,17 @@ ODC_USERNAME='admin'
 ODC_PASSWORD='opendomo'
 
 # hvac conf
-COMFORT_TEMPERATURE_ZONE1=18
-COMFORT_TEMPERATURE_ZONE2=18
+COMFORT_TEMPERATURE_ZONE1=21
+COMFORT_TEMPERATURE_ZONE2=21
 ENDLESS_SCREW_LOADING_TIME=5
 ENDLESS_SCREW_DIFSTOP_TIME=2
-ENDLESS_SCREW_WAITING_TIME=120
+ENDLESS_SCREW_WAITING_TIME=150
 BOILER_WATER_PUMP_WAITING_TIME=60
-UNDERFLOR_HEATING_MAX_TEMPERATURE=45
+BOILER_MIN_TEMPERATURE=20 # we suppose the boiler is off
+BOILER_MAX_TEMPERATURE=70
+INERTIA_MAX_TEMPERATURE=70
+UNDERFLOR_HEATING_MAX_TEMPERATURE=50
+UNDERFLOR_HEATING_ACCEPTED_INERTIA_TEMPERATURE=40
 UNDERFLOR_HEATING_WATER_PUMP_WAITING_TIME=60
 WATER_HEATING_CHECKING_TIME=60
 BOILER_TEMP_MIN_DIFF=5
@@ -186,7 +190,7 @@ def set_value(name, value):
     request = urllib2.Request("http://192.168.1.77:81/set+"+name+'+'+value)
     base64string = base64.b64encode('%s:%s' % (ODC_USERNAME, ODC_PASSWORD))
     request.add_header("Authorization", "Basic %s" % base64string)   
-    result = urllib2.urlopen(request)
+    result = urllib2.urlopen(request, timeout=5)
     data=result.read().split('\n')
     if data[0]!="DONE":
         print "Warning! set_value() failed!"
@@ -196,7 +200,7 @@ def get_value(name):
     request = urllib2.Request("http://192.168.1.77:81/lsc+"+name)
     base64string = base64.b64encode('%s:%s' % (ODC_USERNAME, ODC_PASSWORD))
     request.add_header("Authorization", "Basic %s" % base64string)   
-    result = urllib2.urlopen(request)
+    result = urllib2.urlopen(request, timeout=5)
     data=result.read().split('\n')
     field=data[0].split(':')
     return field[2]
@@ -207,6 +211,27 @@ def debug(string):
     print s+" : "+name+" - "+string
     sys.stdout.flush()
     return
+
+
+class TimedOutExc(Exception):
+   def __str__(self):
+       return "TimedOutExc"
+
+def deadline(timeout, *args):
+    def decorate(f):
+        def handler(signum, frame):
+            raise TimedOutExc()
+
+        def new_f(*args):
+            signal.signal(signal.SIGALRM, handler)
+            signal.alarm(timeout)
+            return f(*args)
+
+        new_f.__name__ = f.__name__
+        return new_f
+    return decorate
+
+
 
 
 
@@ -289,13 +314,31 @@ def copy_temperatures_to_odc():
     set_value("Termo", str(read_temperature("TERMO")*10000)) 
     set_value("Tiner", str(read_temperature("INERCIA_PROBE")*10000)) 
 
-
+@deadline(5)
 def process_endless_screw():
     t0=ENDLESS_SCREW_STATE_T0
     t1=int(time.time())
 
     if ENDLESS_SCREW_STATE=="waiting":
         if t1-t0 > ENDLESS_SCREW_WAITING_TIME:
+            
+            temp_inercia=read_temperature("INERCIA_PROBE")
+            if temp_inercia>INERTIA_MAX_TEMPERATURE:
+                debug("Max inertia temperature reached!")
+                set_state("ENDLESS_SCREW_STATE", "waiting") 
+                return
+
+            temp_probe=read_temperature("BOILER_PROBE")
+            if temp_probe>BOILER_MAX_TEMPERATURE:
+                debug("Max boiler temperature reached!")
+                set_state("ENDLESS_SCREW_STATE", "waiting") 
+                return
+
+            if temp_probe<BOILER_MIN_TEMPERATURE:
+                debug("Boiler temperature too low. Maybe it is off!")
+                set_state("ENDLESS_SCREW_STATE", "waiting") 
+                return
+
             debug("Turn on endless screws")
             set_value("SFqum", "ON"); 
             set_value("SFdep", "ON");
@@ -316,6 +359,7 @@ def process_endless_screw():
             set_state("ENDLESS_SCREW_STATE", "waiting") 
             return
 
+@deadline(5)
 def process_boiler_water_pump():
     t0=BOILER_WATER_PUMP_STATE_T0
     t1=int(time.time())
@@ -336,6 +380,7 @@ def process_boiler_water_pump():
             
         set_state("BOILER_WATER_PUMP_STATE", "waiting") 
 
+@deadline(5)
 def process_underfloor_heating_water_pump_C1():
     t0=UNDERFLOR_HEATING_WATER_PUMP_C1_STATE_T0
     t1=int(time.time())
@@ -348,15 +393,16 @@ def process_underfloor_heating_water_pump_C1():
 
         debug("Inercia temperature: "+str(temp_inercia))
         debug("Circuit temperature: "+str(temp_probe))
-        debug("Home temperature (zone 1): "+str(temp_probe))
+        debug("Home temperature (zone 1): "+str(temp_home))
 
         if temp_probe>UNDERFLOR_HEATING_MAX_TEMPERATURE:
-            debug("Temperature is too high! Turn of pump.")
+            debug("Temperature is too high! Turn off pump.")
             set_value("BmC01", "OFF")
         elif temp_home>=COMFORT_TEMPERATURE_ZONE1:
-            debug("Comfort temperature reached! Turn of pump.")
+            debug("Comfort temperature reached! Turn off pump.")
             set_value("BmC01", "OFF")
-        elif temp_inercia>temp_probe:
+        #elif temp_inercia>temp_probe:
+        elif temp_inercia>UNDERFLOR_HEATING_ACCEPTED_INERTIA_TEMPERATURE:
             debug("Turn on pump")
             set_value("BmC01", "ON")
         else:
@@ -365,6 +411,7 @@ def process_underfloor_heating_water_pump_C1():
             
         set_state("UNDERFLOR_HEATING_WATER_PUMP_C1_STATE", "waiting") 
 
+@deadline(5)
 def process_underfloor_heating_water_pump_C2():
     t0=UNDERFLOR_HEATING_WATER_PUMP_C2_STATE_T0
     t1=int(time.time())
@@ -377,15 +424,16 @@ def process_underfloor_heating_water_pump_C2():
 
         debug("Inercia temperature: "+str(temp_inercia))
         debug("Circuit temperature: "+str(temp_probe))
-        debug("Home temperature (zone 2): "+str(temp_probe))
+        debug("Home temperature (zone 2): "+str(temp_home))
 
         if temp_probe>UNDERFLOR_HEATING_MAX_TEMPERATURE:
-            debug("Temperature is too high! Turn of pump.")
+            debug("Temperature is too high! Turn off pump.")
             set_value("BmC02", "OFF")
         elif temp_home>=COMFORT_TEMPERATURE_ZONE2:
-            debug("Comfort temperature reached! Turn of pump.")
+            debug("Comfort temperature reached! Turn off pump.")
             set_value("BmC02", "OFF")
-        elif temp_inercia>temp_probe:
+        #elif temp_inercia>temp_probe:
+        elif temp_inercia>UNDERFLOR_HEATING_ACCEPTED_INERTIA_TEMPERATURE:
             debug("Turn on pump.")
             set_value("BmC02", "ON")
         else:
@@ -394,9 +442,11 @@ def process_underfloor_heating_water_pump_C2():
             
         set_state("UNDERFLOR_HEATING_WATER_PUMP_C2_STATE", "waiting") 
 
+@deadline(5)
 def water_heating():
     # TODO: turn on water heating only if confort temperature is reached
-    pass
+    while True:
+        pass
 
 
 
@@ -408,29 +458,39 @@ if __name__ == "__main__":
     if len(sys.argv)==2 and sys.argv[1]=="copy-temps":
         copy_temperatures_to_odc()
 
-    if len(sys.argv)==4 and sys.argv[1]=="cmd":
+    if len(sys.argv)==4 and sys.argv[1]=="cmd-set":
         name=sys.argv[2]
         value=sys.argv[3]
         set_value(name, value)
         print get_value(name)
 
+    if len(sys.argv)==3 and sys.argv[1]=="cmd-get":
+        name=sys.argv[2]
+        print get_value(name)
+
+
     elif len(sys.argv)==2 and sys.argv[1]=="run":
 
         signal.signal(signal.SIGINT, stop_all)
+
+        print "-- START --"
 
         debug("turn on turbine")
         set_value("VENTL", "ON")
 
         # Main loop
         while True:
-            sys.stdout.flush()
-            time.sleep(0.5)
-            process_endless_screw()
-            process_boiler_water_pump()
-            process_underfloor_heating_water_pump_C1()
-            process_underfloor_heating_water_pump_C2()
+            try:
+                sys.stdout.flush()
+                time.sleep(0.5)
+                process_endless_screw()
+                process_boiler_water_pump()
+                process_underfloor_heating_water_pump_C1()
+                process_underfloor_heating_water_pump_C2()
+            except Exception,e:
+                print "Error in main loop: "+str(e)
 
     else:
-        print "Usage:", sys.argv[0], "<run|show-temps|copy-temps|cmd>"
+        print "Usage:", sys.argv[0], "<run|show-temps|copy-temps|cmd-set|cmd-get>"
         print 
 
