@@ -36,18 +36,18 @@ ODC_USERNAME='admin'
 ODC_PASSWORD='opendomo'
 
 # hvac conf
-COMFORT_TEMPERATURE_ZONE1=21
-COMFORT_TEMPERATURE_ZONE2=21
+COMFORT_TEMPERATURE_ZONE1=20
+COMFORT_TEMPERATURE_ZONE2=20
 ENDLESS_SCREW_LOADING_TIME=5
 ENDLESS_SCREW_DIFSTOP_TIME=2
-ENDLESS_SCREW_WAITING_TIME=150
+ENDLESS_SCREW_WAITING_TIME=50
 BOILER_WATER_PUMP_WAITING_TIME=60
-BOILER_MIN_TEMPERATURE=20 # we suppose the boiler is off
-BOILER_MAX_TEMPERATURE=70
+BOILER_MIN_TEMPERATURE=30 # we suppose the boiler is off
+BOILER_MAX_TEMPERATURE=80
 INERTIA_MAX_TEMPERATURE=70
 UNDERFLOR_HEATING_MAX_TEMPERATURE=50
 UNDERFLOR_HEATING_ACCEPTED_INERTIA_TEMPERATURE=40
-UNDERFLOR_HEATING_WATER_PUMP_WAITING_TIME=60
+UNDERFLOR_HEATING_WATER_PUMP_WAITING_TIME=300
 WATER_HEATING_CHECKING_TIME=60
 BOILER_TEMP_MIN_DIFF=5
 
@@ -304,6 +304,22 @@ def query_temperatures():
     print
     sys.stdout.flush()
 
+def query_ports():
+    print
+    print "- TERMO:", get_value("TERMO")
+    print "- BmC01:", get_value("BmC01")
+    print "- BmC02:", get_value("BmC02")
+    print "- BmACS:", get_value("BmACS")
+    print "- SFdep:", get_value("SFdep")
+    print "- SFqum:", get_value("SFqum")
+    print "- VENTL:", get_value("VENTL")
+    print "- BmCAL:", get_value("BmCAL")
+    print
+    sys.stdout.flush()
+
+
+
+
 def copy_temperatures_to_odc():
     set_value("Tdown", str(read_temperature("HOME_TEMP_1")*10000))
     set_value("Tupst", str(read_temperature("HOME_TEMP_2")*10000)) 
@@ -314,7 +330,7 @@ def copy_temperatures_to_odc():
     set_value("Termo", str(read_temperature("TERMO")*10000)) 
     set_value("Tiner", str(read_temperature("INERCIA_PROBE")*10000)) 
 
-@deadline(5)
+@deadline(10)
 def process_endless_screw():
     t0=ENDLESS_SCREW_STATE_T0
     t1=int(time.time())
@@ -341,6 +357,7 @@ def process_endless_screw():
 
             debug("Turn on endless screws")
             set_value("SFqum", "ON"); 
+            time.sleep(1)
             set_value("SFdep", "ON");
             set_state("ENDLESS_SCREW_STATE", "loading") 
             return
@@ -359,7 +376,7 @@ def process_endless_screw():
             set_state("ENDLESS_SCREW_STATE", "waiting") 
             return
 
-@deadline(5)
+@deadline(10)
 def process_boiler_water_pump():
     t0=BOILER_WATER_PUMP_STATE_T0
     t1=int(time.time())
@@ -380,7 +397,7 @@ def process_boiler_water_pump():
             
         set_state("BOILER_WATER_PUMP_STATE", "waiting") 
 
-@deadline(5)
+@deadline(10)
 def process_underfloor_heating_water_pump_C1():
     t0=UNDERFLOR_HEATING_WATER_PUMP_C1_STATE_T0
     t1=int(time.time())
@@ -411,7 +428,7 @@ def process_underfloor_heating_water_pump_C1():
             
         set_state("UNDERFLOR_HEATING_WATER_PUMP_C1_STATE", "waiting") 
 
-@deadline(5)
+@deadline(10)
 def process_underfloor_heating_water_pump_C2():
     t0=UNDERFLOR_HEATING_WATER_PUMP_C2_STATE_T0
     t1=int(time.time())
@@ -442,7 +459,7 @@ def process_underfloor_heating_water_pump_C2():
             
         set_state("UNDERFLOR_HEATING_WATER_PUMP_C2_STATE", "waiting") 
 
-@deadline(5)
+@deadline(10)
 def water_heating():
     # TODO: turn on water heating only if confort temperature is reached
     while True:
@@ -454,19 +471,27 @@ if __name__ == "__main__":
 
     if len(sys.argv)==2 and sys.argv[1]=="show-temps":
         query_temperatures()
+        sys.exit(0)
+
+    if len(sys.argv)==2 and sys.argv[1]=="show-ports":
+        query_ports()
+        sys.exit(0)
 
     if len(sys.argv)==2 and sys.argv[1]=="copy-temps":
         copy_temperatures_to_odc()
+        sys.exit(0)
 
     if len(sys.argv)==4 and sys.argv[1]=="cmd-set":
         name=sys.argv[2]
         value=sys.argv[3]
         set_value(name, value)
         print get_value(name)
+        sys.exit(0)
 
     if len(sys.argv)==3 and sys.argv[1]=="cmd-get":
         name=sys.argv[2]
         print get_value(name)
+        sys.exit(0)
 
 
     elif len(sys.argv)==2 and sys.argv[1]=="run":
@@ -489,8 +514,9 @@ if __name__ == "__main__":
                 process_underfloor_heating_water_pump_C2()
             except Exception,e:
                 print "Error in main loop: "+str(e)
+                time.sleep(30)
 
     else:
-        print "Usage:", sys.argv[0], "<run|show-temps|copy-temps|cmd-set|cmd-get>"
+        print "Usage:", sys.argv[0], "<run|show-temps|show-ports|copy-temps|cmd-set|cmd-get>"
         print 
 
