@@ -38,18 +38,20 @@ ODC_PASSWORD='opendomo'
 # hvac conf
 COMFORT_TEMPERATURE_ZONE1=20
 COMFORT_TEMPERATURE_ZONE2=20
-ENDLESS_SCREW_LOADING_TIME=5
-ENDLESS_SCREW_DIFSTOP_TIME=2
-ENDLESS_SCREW_WAITING_TIME=50
+ENDLESS_SCREW_LOADING_TIME=10
+ENDLESS_SCREW_DIFSTOP_TIME=5
+ENDLESS_SCREW_WAITING_TIME=200
 BOILER_WATER_PUMP_WAITING_TIME=60
-BOILER_MIN_TEMPERATURE=30 # we suppose the boiler is off
-BOILER_MAX_TEMPERATURE=80
+BOILER_MIN_TEMPERATURE=10 # we suppose the boiler is off
+BOILER_MAX_TEMPERATURE=70
 INERTIA_MAX_TEMPERATURE=70
 UNDERFLOR_HEATING_MAX_TEMPERATURE=50
 UNDERFLOR_HEATING_ACCEPTED_INERTIA_TEMPERATURE=40
 UNDERFLOR_HEATING_WATER_PUMP_WAITING_TIME=300
 WATER_HEATING_CHECKING_TIME=60
 BOILER_TEMP_MIN_DIFF=5
+TURBINE_RUNNING_TIME=0
+TURBINE_STOPPED_TIME=100-TURBINE_RUNNING_TIME
 
 # state machines
 ENDLESS_SCREW_STATE="waiting"
@@ -60,6 +62,8 @@ UNDERFLOR_HEATING_WATER_PUMP_C1_STATE="waiting"
 UNDERFLOR_HEATING_WATER_PUMP_C1_STATE_T0=int(time.time())
 UNDERFLOR_HEATING_WATER_PUMP_C2_STATE="waiting"
 UNDERFLOR_HEATING_WATER_PUMP_C2_STATE_T0=int(time.time())
+TURBINE_STATE="stop"
+TURBINE_STATE_T0=int(time.time())
 
 
 def init_mb_serial():
@@ -181,29 +185,140 @@ def read_temperature(dev):
 
     return query_temperature_by_name(dev)
 
+def set_output_by_name(dev, value):
+    
+    if value.lower()=="on":
+        value=1
+    else:
+        value=0
+
+    try:
+        addr, fn = 3, 5
+
+        if dev=="PumpCircUp":
+            output=2 # conn=2, output=1
+
+        elif dev=="PumpCircDown":
+            output=3 # conn=3, output=2
+
+        elif dev=="PumpACS":
+            output=4 # conn=4, output=3
+
+        elif dev=="EStank":
+            output=5 # conn=5, output=4
+
+        elif dev=="ESburner":
+            output=6 # conn=6, output=5
+
+        elif dev=="turbine":
+            output=7 # conn=7, output=6
+
+        elif dev=="PumpBoiler":
+            output=8 # conn=8, output=7
+
+        elif dev=="turbine":
+            output=9 # conn=9, output=8
+
+        else:
+            return False
+
+        for i in range(3):
+            try:
+                mb.execute(addr, fn, output-2, output_value=value)
+                return True
+            except:
+                time.sleep(1)
+                pass
+
+        mb.execute(addr, fn, output-1, output_value=value)
+        return True
+
+    except:
+        #print "ERROR:", traceback.format_exc()
+        #return None
+        raise
+
+    return None
+
+
+def get_output_by_name(dev):
+
+    addr, fn = 3, 2
+
+    res=None
+    for i in range(3):
+        try:
+            res=mb.execute(addr, fn, 0, 10)
+        except:
+            time.sleep(1)
+            pass
+      
+    if res==None:
+        res=mb.execute(addr, fn, 0, 10)
+
+    print res
+
+    if dev=="PumpCircUp":
+        return res[2-2] # conn=2, output=1
+
+    elif dev=="PumpCircDown":
+        return res[3-2] # conn=3, output=2
+
+    elif dev=="PumpACS":
+        return res[4-2] # conn=4, output=3
+
+    elif dev=="EStank":
+        return res[5-2] # conn=5, output=4
+
+    elif dev=="ESburner":
+        return res[6-2] # conn=6, output=5
+
+    elif dev=="turbine":
+        return res[7-2] # conn=7, output=6
+
+    elif dev=="PumpBoiler":
+        return res[8-2] # conn=8, output=7
+
+    elif dev=="termo":
+        return res[9-2] # conn=9, output=8
+
+    return None
+
+
 def set_value(name, value):
     #debug("set "+name+" to "+value)
     #if value not in ["ON", "OFF"]:
     #    print "set() unknown value"
     #    sys.exit(0)
 
-    request = urllib2.Request("http://192.168.1.77:81/set+"+name+'+'+value)
-    base64string = base64.b64encode('%s:%s' % (ODC_USERNAME, ODC_PASSWORD))
-    request.add_header("Authorization", "Basic %s" % base64string)   
-    result = urllib2.urlopen(request, timeout=5)
-    data=result.read().split('\n')
-    if data[0]!="DONE":
-        print "Warning! set_value() failed!"
-        sys.stdout.flush()
+    is_modbus = set_output_by_name(name, value)
+
+    # try with ODC
+    if not is_modbus:
+        request = urllib2.Request("http://192.168.1.77:81/set+"+name+'+'+value)
+        base64string = base64.b64encode('%s:%s' % (ODC_USERNAME, ODC_PASSWORD))
+        request.add_header("Authorization", "Basic %s" % base64string)   
+        result = urllib2.urlopen(request, timeout=5)
+        data=result.read().split('\n')
+        if data[0]!="DONE":
+            print "Warning! set_value() failed!"
+            sys.stdout.flush()
+
+
 
 def get_value(name):
-    request = urllib2.Request("http://192.168.1.77:81/lsc+"+name)
-    base64string = base64.b64encode('%s:%s' % (ODC_USERNAME, ODC_PASSWORD))
-    request.add_header("Authorization", "Basic %s" % base64string)   
-    result = urllib2.urlopen(request, timeout=5)
-    data=result.read().split('\n')
-    field=data[0].split(':')
-    return field[2]
+
+    mb_res = get_output_by_name(name)
+    if mb_res==None:
+        request = urllib2.Request("http://192.168.1.77:81/lsc+"+name)
+        base64string = base64.b64encode('%s:%s' % (ODC_USERNAME, ODC_PASSWORD))
+        request.add_header("Authorization", "Basic %s" % base64string)   
+        result = urllib2.urlopen(request, timeout=5)
+        data=result.read().split('\n')
+        field=data[0].split(':')
+        return field[2]
+    else:
+        return mb_res
 
 def debug(string):
     s="["+strftime("%Y-%m-%d %H:%M:%S")+"]"
@@ -273,6 +388,16 @@ def set_state(state_machine, state):
         UNDERFLOR_HEATING_WATER_PUMP_C2_STATE=state
         UNDERFLOR_HEATING_WATER_PUMP_C2_STATE_T0=int(time.time())
 
+
+    if state_machine=="TURBINE_STATE":
+        global TURBINE_STATE
+        global TURBINE_STATE_T0
+        debug("TURBINE_STATE: "+TURBINE_STATE +" -> "+state)
+        TURBINE_STATE=state
+        TURBINE_STATE_T0=int(time.time())
+
+
+
 def stop_all(signum, frame):
     print 'exit ...' 
     set_value("TERMO", "OFF"); print "TERMO:", get_value("TERMO")
@@ -305,7 +430,10 @@ def query_temperatures():
     sys.stdout.flush()
 
 def query_ports():
-    print
+    print "Modbus ports:"
+    print "- TERMO:", get_value("TERMO")
+
+    print "ODControl ports:"
     print "- TERMO:", get_value("TERMO")
     print "- BmC01:", get_value("BmC01")
     print "- BmC02:", get_value("BmC02")
@@ -341,12 +469,14 @@ def process_endless_screw():
             temp_inercia=read_temperature("INERCIA_PROBE")
             if temp_inercia>INERTIA_MAX_TEMPERATURE:
                 debug("Max inertia temperature reached!")
+                set_value("VENTL", "OFF"); 
                 set_state("ENDLESS_SCREW_STATE", "waiting") 
                 return
 
             temp_probe=read_temperature("BOILER_PROBE")
             if temp_probe>BOILER_MAX_TEMPERATURE:
                 debug("Max boiler temperature reached!")
+                set_value("VENTL", "OFF"); 
                 set_state("ENDLESS_SCREW_STATE", "waiting") 
                 return
 
@@ -465,6 +595,42 @@ def water_heating():
     while True:
         pass
 
+@deadline(10)
+def process_turbine():
+    t0=TURBINE_STATE_T0
+    t1=int(time.time())
+
+    if TURBINE_STATE=="stop":
+        if t1-t0 > TURBINE_STOPPED_TIME:
+            
+            temp_inercia=read_temperature("INERCIA_PROBE")
+            if temp_inercia>INERTIA_MAX_TEMPERATURE:
+                debug("Max inertia temperature reached!")
+                set_value("VENTL", "OFF"); 
+                set_state("TURBINE_STATE", "stop") 
+                return
+
+            temp_probe=read_temperature("BOILER_PROBE")
+            if temp_probe>BOILER_MAX_TEMPERATURE:
+                debug("Max boiler temperature reached!")
+                set_value("VENTL", "OFF"); 
+                set_state("TURBINE_STATE", "stop") 
+                return
+
+            debug("Turn on turbine")
+            set_value("VENTL", "ON"); 
+            set_state("TURBINE_STATE", "run") 
+            return
+
+    if TURBINE_STATE=="run":
+        if t1-t0 > TURBINE_RUNNING_TIME:
+            debug("Turn off turbine")
+            set_value("VENTL", "OFF"); 
+            set_state("TURBINE_STATE", "stop") 
+            return
+
+
+
 
 
 if __name__ == "__main__":
@@ -500,21 +666,22 @@ if __name__ == "__main__":
 
         print "-- START --"
 
-        debug("turn on turbine")
-        set_value("VENTL", "ON")
+        #debug("turn on turbine")
+        #set_value("VENTL", "ON")
 
         # Main loop
         while True:
             try:
                 sys.stdout.flush()
                 time.sleep(0.5)
+                process_turbine()
                 process_endless_screw()
                 process_boiler_water_pump()
                 process_underfloor_heating_water_pump_C1()
                 process_underfloor_heating_water_pump_C2()
             except Exception,e:
                 print "Error in main loop: "+str(e)
-                time.sleep(30)
+                time.sleep(1)
 
     else:
         print "Usage:", sys.argv[0], "<run|show-temps|show-ports|copy-temps|cmd-set|cmd-get>"
