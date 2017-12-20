@@ -39,8 +39,8 @@ ODC_PASSWORD='opendomo'
 COMFORT_TEMPERATURE_ZONE1=20
 COMFORT_TEMPERATURE_ZONE2=20
 ENDLESS_SCREW_LOADING_TIME=10
-ENDLESS_SCREW_DIFSTOP_TIME=5
-ENDLESS_SCREW_WAITING_TIME=200
+ENDLESS_SCREW_DIFSTOP_TIME=2
+ENDLESS_SCREW_WAITING_TIME=100
 BOILER_WATER_PUMP_WAITING_TIME=60
 BOILER_MIN_TEMPERATURE=10 # we suppose the boiler is off
 BOILER_MAX_TEMPERATURE=70
@@ -49,9 +49,9 @@ UNDERFLOR_HEATING_MAX_TEMPERATURE=50
 UNDERFLOR_HEATING_ACCEPTED_INERTIA_TEMPERATURE=40
 UNDERFLOR_HEATING_WATER_PUMP_WAITING_TIME=300
 WATER_HEATING_CHECKING_TIME=60
-BOILER_TEMP_MIN_DIFF=5
-TURBINE_RUNNING_TIME=0
-TURBINE_STOPPED_TIME=100-TURBINE_RUNNING_TIME
+BOILER_TEMP_MIN_DIFF=10
+TURBINE_RUNNING_TIME=10
+TURBINE_STOPPED_TIME=3600-TURBINE_RUNNING_TIME
 
 # state machines
 ENDLESS_SCREW_STATE="waiting"
@@ -216,7 +216,7 @@ def set_output_by_name(dev, value):
         elif dev=="PumpBoiler":
             output=8 # conn=8, output=7
 
-        elif dev=="turbine":
+        elif dev=="termo":
             output=9 # conn=9, output=8
 
         else:
@@ -256,7 +256,7 @@ def get_output_by_name(dev):
     if res==None:
         res=mb.execute(addr, fn, 0, 10)
 
-    print res
+    #print res
 
     if dev=="PumpCircUp":
         return res[2-2] # conn=2, output=1
@@ -431,7 +431,14 @@ def query_temperatures():
 
 def query_ports():
     print "Modbus ports:"
-    print "- TERMO:", get_value("TERMO")
+    print "- PumpCircUp:", get_value("PumpCircUp")
+    print "- PumpCircDown:", get_value("PumpCircDown")
+    print "- PumpCircACS:", get_value("PumpACS")
+    print "- EStank:", get_value("EStank")
+    print "- ESburner:", get_value("ESburner")
+    print "- turbine:", get_value("turbine")
+    print "- PumpBoiler:", get_value("PumpBoiler")
+    print "- termo:", get_value("termo")
 
     print "ODControl ports:"
     print "- TERMO:", get_value("TERMO")
@@ -674,6 +681,7 @@ if __name__ == "__main__":
             try:
                 sys.stdout.flush()
                 time.sleep(0.5)
+
                 process_turbine()
                 process_endless_screw()
                 process_boiler_water_pump()
