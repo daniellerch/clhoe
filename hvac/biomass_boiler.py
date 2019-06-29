@@ -37,21 +37,27 @@ ODC_PASSWORD='opendomo'
 
 # hvac conf
 COMFORT_TEMPERATURE_ZONE1=20
-COMFORT_TEMPERATURE_ZONE2=18
-ENDLESS_SCREW_LOADING_TIME=15
+COMFORT_TEMPERATURE_ZONE2=20
+ENDLESS_SCREW_LOADING_TIME=5
+#ENDLESS_SCREW_LOADING_TIME=5
+#ENDLESS_SCREW_LOADING_TIME=10 # min 5
+#ENDLESS_SCREW_LOADING_TIME=15 # min -2
+#ENDLESS_SCREW_LOADING_TIME=20 # min -5
 ENDLESS_SCREW_DIFSTOP_TIME=2
-ENDLESS_SCREW_WAITING_TIME=100
+ENDLESS_SCREW_WAITING_TIME=500
 BOILER_WATER_PUMP_WAITING_TIME=60
+BOILER_WATER_PUMP_WAITING_TIME=300
 BOILER_MIN_TEMPERATURE=10 # we suppose the boiler is off
 BOILER_MAX_TEMPERATURE=50
 INERTIA_MAX_TEMPERATURE=50
 UNDERFLOR_HEATING_MAX_TEMPERATURE=50
-UNDERFLOR_HEATING_ACCEPTED_INERTIA_TEMPERATURE=35
+UNDERFLOR_HEATING_ACCEPTED_INERTIA_TEMPERATURE=30
 UNDERFLOR_HEATING_WATER_PUMP_WAITING_TIME=120
 WATER_HEATING_CHECKING_TIME=60
-BOILER_TEMP_MIN_DIFF=2
+BOILER_TEMP_MIN_DIFF=10
 TURBINE_RUNNING_TIME=5
-TURBINE_STOPPED_TIME=900-TURBINE_RUNNING_TIME
+#TURBINE_STOPPED_TIME=1000-TURBINE_RUNNING_TIME
+TURBINE_STOPPED_TIME=500-TURBINE_RUNNING_TIME
 
 # state machines
 ENDLESS_SCREW_STATE="waiting"
@@ -291,7 +297,8 @@ def set_value(name, value):
     #    print "set() unknown value"
     #    sys.exit(0)
 
-    is_modbus = set_output_by_name(name, value)
+    # is_modbus = set_output_by_name(name, value)
+    is_modbus = False
 
     # try with ODC
     if not is_modbus:
@@ -308,7 +315,8 @@ def set_value(name, value):
 
 def get_value(name):
 
-    mb_res = get_output_by_name(name)
+    # mb_res = get_output_by_name(name)
+    mb_res = None
     if mb_res==None:
         request = urllib2.Request("http://192.168.1.77:81/lsc+"+name)
         base64string = base64.b64encode('%s:%s' % (ODC_USERNAME, ODC_PASSWORD))
@@ -414,14 +422,14 @@ def stop_all(signum, frame):
 def query_temperatures():
     print
     print "MODBUS DIRECT:"
-    print "- HOME_TEMP_1:", read_temperature("HOME_TEMP_1")
-    print "- HOME_TEMP_2:", read_temperature("HOME_TEMP_2")
+    #print "- HOME_TEMP_1:", read_temperature("HOME_TEMP_1")
+    #print "- HOME_TEMP_2:", read_temperature("HOME_TEMP_2")
     print 
     print "MODBUS GATEWAY:"
-    print "- C1_PROBE:", read_temperature("C1_PROBE")
-    print "- C2_PROBE:", read_temperature("C2_PROBE")
-    print "- BOILER_PROBE:", read_temperature("BOILER_PROBE")
-    print "- INERCIA_PROBE:", read_temperature("INERCIA_PROBE")
+    #print "- C1_PROBE:", read_temperature("C1_PROBE")
+    #print "- C2_PROBE:", read_temperature("C2_PROBE")
+    #print "- BOILER_PROBE:", read_temperature("BOILER_PROBE")
+    #print "- INERCIA_PROBE:", read_temperature("INERCIA_PROBE")
     print "- ACS:", read_temperature("ACS")
     print "- TERMO:", read_temperature("TERMO")
     print "- NONE_11:", read_temperature("NONE_11")
@@ -430,6 +438,7 @@ def query_temperatures():
     sys.stdout.flush()
 
 def query_ports():
+    """
     print "Modbus ports:"
     print "- PumpCircUp:", get_value("PumpCircUp")
     print "- PumpCircDown:", get_value("PumpCircDown")
@@ -439,6 +448,7 @@ def query_ports():
     print "- turbine:", get_value("turbine")
     print "- PumpBoiler:", get_value("PumpBoiler")
     print "- termo:", get_value("termo")
+    """
 
     print "ODControl ports:"
     print "- TERMO:", get_value("TERMO")
@@ -451,9 +461,6 @@ def query_ports():
     print "- BmCAL:", get_value("BmCAL")
     print
     sys.stdout.flush()
-
-
-
 
 def copy_temperatures_to_odc():
     set_value("Tdown", str(read_temperature("HOME_TEMP_1")*10000))

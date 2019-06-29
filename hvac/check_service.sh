@@ -70,10 +70,10 @@ alert_if_GT $R 95 "[$ID] Root Disk $R% " ""
 R=$(df /var/log | grep / | awk '{ print $5}' | sed 's/%//g')
 alert_if_GT $R 95 "[$ID] Root Disk $R% " ""
 
-R=$(/home/dlerch/clhoe/hvac/biomass_boiler.py cmd-get Tboil|tr [+] 0)
-alert_if_LT $R 30 "[$ID] Boiler temperature $R% " ""
+#R=$(/home/dlerch/clhoe/hvac/daikin_boiler.py cmd-get Tboil|tr [+] 0)
+#alert_if_LT $R 30 "[$ID] Boiler temperature $R% " ""
 
-R=$(pgrep biomass_boiler|wc -l)
+R=$(pgrep daikin_boiler|wc -l)
 alert_if_LT $R 1 "[$ID] Alert: Main process down" ""
 
 
@@ -86,7 +86,7 @@ R=$(df /var/log | grep / | awk '{ print $5}' | sed 's/%//g')
 truncate_if_GT $R 90 "/var/log/mail.info"
 
 R=$(df /var/log | grep / | awk '{ print $5}' | sed 's/%//g')
-truncate_if_GT $R 90 "/var/log/biomass_boiler.log"
+truncate_if_GT $R 90 "/var/log/daikin_boiler.log"
 
 
 
