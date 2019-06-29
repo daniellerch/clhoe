@@ -1,10 +1,11 @@
 #!/bin/bash
 
-BIN=daikin_boiler
+#BIN=daikin_boiler
+BIN=daikin_boiler_summer
 #BIN=biomass_boiler
 #BIN=termo_boiler
 
-if pgrep $BIN
+if pgrep boiler
 then
 	echo "running"
 else
